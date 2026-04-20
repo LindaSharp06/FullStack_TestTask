@@ -20,7 +20,7 @@
 
 ### Фронтенд
 
-Монолитный `page.tsx` (~300 строк) разбит на слои:
+Монолитный `page.tsx` разбит на слои:
 
 ```
 lib/types.ts          — типы FileItem, AlertItem
@@ -30,7 +30,7 @@ components/
   FileTable.tsx        — таблица файлов
   AlertTable.tsx       — таблица алертов
   UploadModal.tsx      — форма загрузки со своим состоянием
-app/page.tsx           — ~80 строк, только layout и загрузка данных
+app/page.tsx           — только layout и загрузка данных
 ```
 
 Захардкоженный `http://localhost:8000` в трёх местах заменён на переменную окружения `NEXT_PUBLIC_API_URL`.
