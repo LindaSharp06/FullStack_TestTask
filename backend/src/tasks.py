@@ -1,27 +1,19 @@
 import asyncio
 import os
 from pathlib import Path
+
 from celery import Celery
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+
+from src.database import async_session_maker
 from src.models import Alert, StoredFile
-from src.service import STORAGE_DIR, DB_URL
+from src.storage import STORAGE_DIR, get_path
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://backend-redis:6379/0")
-_worker_loop: asyncio.AbstractEventLoop | None = None
-
-
-def run_in_worker_loop(coroutine):
-    global _worker_loop
-    if _worker_loop is None or _worker_loop.is_closed():
-        _worker_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(_worker_loop)
-    return _worker_loop.run_until_complete(coroutine)
-
 
 celery_app = Celery("file_tasks", broker=REDIS_URL, backend=REDIS_URL)
-engine = create_async_engine(DB_URL)
-async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
+
+# --- async implementations ---
 
 async def _scan_file_for_threats(file_id: str) -> None:
     async with async_session_maker() as session:
@@ -56,7 +48,7 @@ async def _extract_file_metadata(file_id: str) -> None:
         if not file_item:
             return
 
-        stored_path = STORAGE_DIR / file_item.stored_name
+        stored_path = get_path(file_item.stored_name)
         if not stored_path.exists():
             file_item.processing_status = "failed"
             file_item.scan_status = file_item.scan_status or "failed"
@@ -107,16 +99,18 @@ async def _send_file_alert(file_id: str) -> None:
         await session.commit()
 
 
+# --- Celery task wrappers ---
+
 @celery_app.task
 def scan_file_for_threats(file_id: str) -> None:
-    run_in_worker_loop(_scan_file_for_threats(file_id))
+    asyncio.run(_scan_file_for_threats(file_id))
 
 
 @celery_app.task
 def extract_file_metadata(file_id: str) -> None:
-    run_in_worker_loop(_extract_file_metadata(file_id))
+    asyncio.run(_extract_file_metadata(file_id))
 
 
 @celery_app.task
 def send_file_alert(file_id: str) -> None:
-    run_in_worker_loop(_send_file_alert(file_id))
+    asyncio.run(_send_file_alert(file_id))

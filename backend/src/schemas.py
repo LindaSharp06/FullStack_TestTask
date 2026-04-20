@@ -9,6 +9,7 @@ class FileItem(BaseModel):
     id: str
     title: str
     original_name: str
+    stored_name: str
     mime_type: str
     size: int
     processing_status: str
